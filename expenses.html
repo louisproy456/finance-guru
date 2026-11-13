@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Life Expenses Form</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   Same look as Finance Guru. Layout idea: one column of plain
+   questions, with the grand total always in view at the bottom.
+------------------------------------------------------------------- */
+:root {
+  --paper: #f3f5f8; --card: #ffffff; --ink: #17202e; --muted: #5b6677; --line: #d7dde6;
+  --accent: #2743c4; --accent-soft: #e6eaff;
+  --good: #17734a; --good-soft: #dff3e8;
+  --bad: #b02a1f;  --bad-soft: #fde3df;
+  --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #10141b; --card: #19202b; --ink: #e8ecf3; --muted: #9aa5b8; --line: #2e3848;
+    --accent: #8fa2ff; --accent-soft: #232c52;
+    --good: #5fd39a; --good-soft: #12331f; --bad: #ff8f84; --bad-soft: #40191a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10141b; --card: #19202b; --ink: #e8ecf3; --muted: #9aa5b8; --line: #2e3848;
+  --accent: #8fa2ff; --accent-soft: #232c52;
+  --good: #5fd39a; --good-soft: #12331f; --bad: #ff8f84; --bad-soft: #40191a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 130px; display: flex; flex-direction: column; gap: 18px; }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 26px; font-weight: 700; }
+h2 { font-size: 19px; font-weight: 500; }
+p { margin: 0; }
+.muted { color: var(--muted); font-size: 14px; }
+[hidden] { display: none !important; }
+
+input, select, button, textarea { font: inherit; color: inherit; }
+input, select, textarea { width: 100%; min-width: 0; padding: 9px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+input:disabled, select:disabled, textarea:disabled { background: var(--paper); opacity: 1; }
+button { padding: 10px 16px; border-radius: 6px; cursor: pointer; border: 1px solid var(--line); background: var(--card); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--card); font-weight: 600; }
+button.add { border-style: dashed; color: var(--accent); font-weight: 500; }
+button.del { padding: 9px 0; width: 38px; color: var(--muted); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.sub { font-family: var(--display); font-weight: 700; font-size: 18px; white-space: nowrap; }
+.who { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.who label, .field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+
+/* One expense line: the question on the left, the blanks on the right. */
+.line { display: grid; grid-template-columns: minmax(0, 1fr) 120px 70px 124px; gap: 8px; align-items: center; padding-top: 12px; border-top: 1px solid var(--line); }
+.line:first-of-type { border-top: 0; padding-top: 0; }
+.line .q { display: flex; flex-direction: column; }
+.line .q b { font-weight: 500; }
+.line.extra { grid-template-columns: minmax(0, 1fr) 120px 38px; }
+.amount { position: relative; }
+.amount span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.amount input { padding-left: 22px; }
+
+.banner { padding: 14px 16px; border-radius: 10px; background: var(--accent-soft); display: flex; flex-direction: column; gap: 8px; }
+.banner.bad { background: var(--bad-soft); color: var(--bad); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.msg { font-size: 14px; color: var(--good); min-height: 21px; }
+
+/* The grand total stays on screen while you scroll. */
+.totalbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--ink); color: var(--paper); }
+.totalbar .in { max-width: 720px; margin: 0 auto; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.totalbar .big { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.1; }
+.totalbar small { font-size: 13px; opacity: .8; display: block; }
+.totalbar .right { text-align: right; }
+
+@media (max-width: 560px) {
+  .who { grid-template-columns: 1fr; }
+  .line { grid-template-columns: minmax(0, 1.4fr) 64px minmax(0, 1.2fr); }
+  .line .q { grid-column: 1 / -1; }
+  .line.plain { grid-template-columns: minmax(0, 1fr); }
+  .line.extra { grid-template-columns: minmax(0, 1fr) 38px; }
+  .line.extra > :first-child { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div>
+    <h1>Life Expenses Form</h1>
+    <p class="muted">Type what each thing costs you in a normal month. A good guess is fine. Leave a line empty if it does not apply to you.</p>
+  </div>
+
+  <!-- Shown when someone opens a link that another person sent -->
+  <div id="viewer" class="banner" hidden>
+    <b id="viewerTitle"></b>
+    <span class="muted">These are their numbers, shown read-only. Nothing you do here changes their copy.</span>
+    <div class="actions">
+      <button id="exportBtn" class="primary" type="button">Copy for Finance Guru</button>
+      <button id="ownBtn" type="button">Fill in my own form instead</button>
+    </div>
+    <span id="viewerMsg" class="msg" role="status"></span>
+  </div>
+  <div id="broken" class="banner bad" hidden>This link is incomplete or damaged. Ask for it to be sent again.</div>
+
+  <section class="card">
+    <div class="who">
+      <label for="name">Your name
+        <input id="name" type="text" placeholder="First name" autocomplete="given-name"></label>
+      <label for="income">Money coming in each month (optional)
+        <span class="amount"><span>$</span><input id="income" type="number" min="0" step="1" inputmode="decimal" placeholder="after taxes"></span></label>
+    </div>
+  </section>
+
+  <!-- The four groups of questions are built by the script below -->
+  <div id="groups" style="display:flex;flex-direction:column;gap:18px"></div>
+
+  <section class="card">
+    <div class="head"><h2>Anything else</h2><span class="sub" id="sub-extra"></span></div>
+    <p class="muted">Other monthly costs not listed above: phone, internet, subscriptions, child care...</p>
+    <div id="extras"></div>
+    <button id="addBtn" class="add" type="button">+ Add another expense</button>
+  </section>
+
+  <section class="card">
+    <label class="field" for="notes">Notes for Dad (optional)
+      <textarea id="notes" rows="3" placeholder="Anything you were not sure about, or bills that change a lot"></textarea></label>
+  </section>
+
+  <section class="card" id="sendCard">
+    <h2>When you are done</h2>
+    <p class="muted">This makes a private link that holds your numbers. Send it to Dad by text or Telegram. Only people you send the link to can see them.</p>
+    <div class="actions">
+      <button id="sendBtn" class="primary" type="button">Send to Dad</button>
+      <button id="copyBtn" type="button">Copy a text summary</button>
+    </div>
+    <span id="sendMsg" class="msg" role="status"></span>
+    <label class="field" for="linkBox" id="linkWrap" hidden>Your link (press and hold to copy)
+      <input id="linkBox" type="text" readonly></label>
+    <p class="muted">Your numbers are also kept on this phone, so you can close the page and come back. Never type bank passwords or card numbers here.</p>
+  </section>
+</div>
+
+<div class="totalbar" aria-live="polite">
+  <div class="in">
+    <div><small>Grand total each month</small><span class="big" id="grand">$0.00</span></div>
+    <div class="right"><small id="yearly"></small><small id="leftover"></small><small id="progress"></small></div>
+  </div>
+</div>
+
+<script>
+/* ====================================================================
+   LIFE EXPENSES FORM  -  a temporary helper for Finance Guru.
+
+   What it does:
+     * shows one blank per monthly expense and adds everything up
+     * keeps the numbers in this browser so nothing is lost
+     * "Send to Dad" packs the numbers into a link (no server needed)
+     * "Copy for Finance Guru" turns them into the exact shape the
+       main Finance Guru page stores, so they can be imported later
+   ==================================================================== */
+
+/* ---------- A. The questions ----------
+   bill: true  = a bill with a due date (goes into Finance Guru's "bills")
+   bill: false = everyday spending       (goes into "everyday spending")   */
+const GROUPS = [
+  { id: 'house', title: 'House', rows: [
+    { id: 'mortgage',    label: 'Mortgage payment',        bill: true },
+    { id: 'houseIns',    label: 'House insurance',         bill: true },
+    { id: 'houseTax',    label: 'House (property) taxes',  bill: true,  hint: 'Yearly bill divided by 12' },
+    { id: 'hydro',       label: 'Hydro (electricity)',     bill: true,  hint: 'A usual month' },
+    { id: 'houseRepair', label: 'House repairs',           bill: false, hint: 'What you spend in a year, divided by 12' } ] },
+  { id: 'truck', title: 'Truck', rows: [
+    { id: 'carIns',      label: 'Car / truck insurance',   bill: true },
+    { id: 'gas',         label: 'Gasoline',                bill: false },
+    { id: 'truckMaint',  label: 'Truck maintenance',       bill: false, hint: 'Oil, tires, repairs: yearly cost divided by 12' } ] },
+  { id: 'food', title: 'Food', rows: [
+    { id: 'food',        label: 'Food and groceries',      bill: false, hint: 'Include take-out and restaurants' } ] },
+  { id: 'debt', title: 'Debts and taxes', rows: [
+    { id: 'creditCard',   label: 'Credit card payment',      bill: true, hint: 'What you pay each month, not the balance' },
+    { id: 'personalDebt', label: 'Personal debt payment',    bill: true, hint: 'Loans from a bank or a person' },
+    { id: 'generalDebt',  label: 'Other debt payment',       bill: true, hint: 'Any other loan or payment plan' },
+    { id: 'govTax',       label: 'Government taxes payment', bill: true, hint: 'Only if you pay tax in instalments' } ] }
+];
+const ROWS = GROUPS.flatMap(g => g.rows);
+const PAY = { '': 'How paid?', auto: 'Automatic', etransfer: 'e-Transfer', manual: 'By hand' };
+const KEY = 'financeGuru.expenses.v1';
+const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' });
+const fmt = n => money.format(Math.round(n * 100) / 100);
+const num = v => { const n = parseFloat(v); return isFinite(n) && n > 0 ? n : 0; };
+
+/* ---------- B. The data ---------- */
+function blank() {
+  const s = { name: '', income: '', notes: '', rows: {}, extras: [], at: 0 };
+  for (const r of ROWS) s.rows[r.id] = { amount: '', day: '', pay: '' };
+  return s;
+}
+let state = blank();
+let readOnly = false;      // true when looking at a link someone sent
+
+function save() {
+  if (readOnly) return;
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* page still works */ }
+}
+function load() {
+  try {
+    const got = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (got && got.rows) state = merge(got);
+  } catch (e) { /* start blank */ }
+}
+// Copies saved values onto a fresh blank form, so a missing field never breaks the page.
+function merge(got) {
+  const s = blank();
+  s.name = String(got.name || '').slice(0, 60); s.income = got.income || ''; s.notes = String(got.notes || '').slice(0, 1000); s.at = got.at || 0;
+  for (const r of ROWS) if (got.rows && got.rows[r.id]) Object.assign(s.rows[r.id], got.rows[r.id]);
+  if (Array.isArray(got.extras)) s.extras = got.extras.slice(0, 30).map(x => ({ name: String(x.name || '').slice(0, 60), amount: x.amount || '' }));
+  return s;
+}
+
+/* ---------- C. The math ---------- */
+function totals() {
+  const groups = {};
+  let filled = 0;
+  for (const g of GROUPS) {
+    groups[g.id] = g.rows.reduce((t, r) => t + num(state.rows[r.id].amount), 0);
+    filled += g.rows.filter(r => state.rows[r.id].amount !== '').length;
+  }
+  groups.extra = state.extras.reduce((t, x) => t + num(x.amount), 0);
+  const grand = Object.values(groups).reduce((a, b) => a + b, 0);
+  return { groups, grand, filled };
+}
+
+/* ---------- D. Packing the numbers into a link ----------
+   The numbers travel after the # in the address. That part of an address
+   is never sent to GitHub: it stays between the two phones.               */
+function pack() {
+  const small = { n: state.name, i: state.income, t: state.notes, at: Date.now(), r: {}, x: state.extras.filter(x => x.name || x.amount).map(x => [x.name, x.amount]) };
+  for (const r of ROWS) { const v = state.rows[r.id]; if (v.amount !== '' || v.day !== '' || v.pay) small.r[r.id] = [v.amount, v.day, v.pay]; }
+  const bytes = new TextEncoder().encode(JSON.stringify(small));
+  let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function unpack(code) {
+  const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/'));
+  const small = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+  const got = { name: small.n, income: small.i, notes: small.t, at: small.at, rows: {}, extras: (small.x || []).map(x => ({ name: x[0], amount: x[1] })) };
+  for (const id of Object.keys(small.r || {})) got.rows[id] = { amount: small.r[id][0], day: small.r[id][1], pay: small.r[id][2] };
+  return merge(got);
+}
+
+/* ---------- E. The shape Finance Guru stores ----------
+   Exactly what the main page saves, so it can be imported as-is.          */
+function forFinanceGuru() {
+  const out = { household: state.name, incomes: [], bills: [], spending: [], fund: { saved: '', monthly: '', months: 3 } };
+  if (num(state.income)) out.incomes.push({ name: 'Take-home pay', amount: num(state.income), freq: 'monthly' });
+  for (const r of ROWS) {
+    const v = state.rows[r.id];
+    if (!num(v.amount)) continue;
+    if (r.bill) out.bills.push({ name: r.label, amount: num(v.amount), day: num(v.day) || '', pay: v.pay || 'manual' });
+    else out.spending.push({ name: r.label, amount: num(v.amount) });
+  }
+  for (const x of state.extras) if (num(x.amount)) out.spending.push({ name: x.name || 'Other', amount: num(x.amount) });
+  return out;
+}
+
+/* ---------- F. Drawing ---------- */
+function el(tag, props, kids) {
+  const e = Object.assign(document.createElement(tag), props || {});
+  for (const k of kids || []) e.append(k);
+  return e;
+}
+function amountBox(id, value, label, onInput) {
+  const input = el('input', { id, type: 'number', min: 0, step: '0.01', inputMode: 'decimal', placeholder: 'per month', value, disabled: readOnly });
+  input.setAttribute('aria-label', label);
+  input.addEventListener('input', () => onInput(input.value));
+  return el('span', { className: 'amount' }, [el('span', { textContent: '$' }), input]);
+}
+
+function drawGroups() {
+  const box = document.getElementById('groups');
+  box.textContent = '';
+  for (const g of GROUPS) {
+    const card = el('section', { className: 'card' }, [
+      el('div', { className: 'head' }, [el('h2', { textContent: g.title }), el('span', { className: 'sub', id: 'sub-' + g.id })])
+    ]);
+    for (const r of g.rows) {
+      const v = state.rows[r.id];
+      const q = el('div', { className: 'q' }, [el('b', { textContent: r.label })]);
+      if (r.hint) q.append(el('span', { className: 'muted', textContent: r.hint }));
+      const line = el('div', { className: 'line' + (r.bill ? '' : ' plain') }, [q, amountBox('a-' + r.id, v.amount, r.label + ', dollars per month', val => { v.amount = val; changed(); })]);
+      if (r.bill) {
+        const day = el('input', { id: 'd-' + r.id, type: 'number', min: 1, max: 31, step: 1, inputMode: 'numeric', placeholder: 'Day', value: v.day, disabled: readOnly });
+        day.setAttribute('aria-label', r.label + ', day of the month it is due (optional)');
+        day.addEventListener('input', () => { v.day = day.value; changed(); });
+        const pay = el('select', { id: 'p-' + r.id, disabled: readOnly });
+        pay.setAttribute('aria-label', r.label + ', how it gets paid (optional)');
+        for (const k of Object.keys(PAY)) pay.append(el('option', { value: k, textContent: PAY[k] }));
+        pay.value = v.pay;
+        pay.addEventListener('change', () => { v.pay = pay.value; changed(); });
+        line.append(day, pay);
+      } else {
+        line.append(el('span'), el('span'));           // keeps the amount boxes lined up
+      }
+      card.append(line);
+    }
+    box.append(card);
+  }
+}
+
+function drawExtras() {
+  const box = document.getElementById('extras');
+  box.textContent = '';
+  state.extras.forEach((x, i) => {
+    const name = el('input', { id: 'x-' + i + '-name', type: 'text', placeholder: 'What is it?', value: x.name, disabled: readOnly });
+    name.setAttribute('aria-label', 'Name of the extra expense');
+    name.addEventListener('input', () => { x.name = name.value; changed(); });
+    const line = el('div', { className: 'line extra' }, [name, amountBox('x-' + i + '-amount', x.amount, 'Extra expense, dollars per month', val => { x.amount = val; changed(); })]);
+    if (!readOnly) {
+      const del = el('button', { type: 'button', className: 'del', textContent: '×' });
+      del.setAttribute('aria-label', 'Remove this expense');
+      del.addEventListener('click', () => { state.extras.splice(i, 1); drawExtras(); changed(); });
+      line.append(del);
+    }
+    box.append(line);
+  });
+}
+
+function drawTotals() {
+  const t = totals();
+  for (const g of GROUPS) document.getElementById('sub-' + g.id).textContent = fmt(t.groups[g.id]);
+  document.getElementById('sub-extra').textContent = fmt(t.groups.extra);
+  document.getElementById('grand').textContent = fmt(t.grand);
+  document.getElementById('yearly').textContent = 'That is ' + fmt(t.grand * 12) + ' a year';
+  const income = num(state.income);
+  const left = income - t.grand;
+  document.getElementById('leftover').textContent = income ? (left >= 0 ? fmt(left) + ' left over each month' : fmt(-left) + ' SHORT each month') : '';
+  document.getElementById('progress').textContent = readOnly ? '' : t.filled + ' of ' + ROWS.length + ' lines filled in';
+}
+
+function changed() { state.at = Date.now(); save(); drawTotals(); }
+
+function drawAll() {
+  document.getElementById('name').value = state.name;
+  document.getElementById('income').value = state.income;
+  document.getElementById('notes').value = state.notes;
+  for (const id of ['name', 'income', 'notes']) document.getElementById(id).disabled = readOnly;
+  document.getElementById('addBtn').hidden = readOnly;
+  document.getElementById('sendCard').hidden = readOnly;
+  drawGroups(); drawExtras(); drawTotals();
+}
+
+/* ---------- G. Buttons ---------- */
+document.getElementById('name').addEventListener('input', e => { state.name = e.target.value; changed(); });
+document.getElementById('income').addEventListener('input', e => { state.income = e.target.value; changed(); });
+document.getElementById('notes').addEventListener('input', e => { state.notes = e.target.value; changed(); });
+document.getElementById('addBtn').addEventListener('click', () => {
+  state.extras.push({ name: '', amount: '' }); drawExtras(); changed();
+  document.getElementById('x-' + (state.extras.length - 1) + '-name').focus();
+});
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
+}
+
+// "Send to Dad": opens the phone's share sheet if it has one, otherwise copies the link.
+document.getElementById('sendBtn').addEventListener('click', async () => {
+  const link = location.href.split('#')[0] + '#d=' + pack();   // works on GitHub and when the file is opened straight from a computer
+  const box = document.getElementById('linkBox'), msg = document.getElementById('sendMsg');
+  box.value = link; document.getElementById('linkWrap').hidden = false;
+  if (navigator.share) {
+    try { await navigator.share({ title: 'My monthly expenses', text: (state.name || 'My') + ' monthly expenses: ' + fmt(totals().grand), url: link }); msg.textContent = 'Shared.'; return; }
+    catch (e) { /* cancelled or blocked: fall through to copying */ }
+  }
+  msg.textContent = (await copyText(link)) ? 'Link copied. Paste it in a message to Dad.' : 'Copy the link from the box below and send it to Dad.';
+  box.focus(); box.select();
+});
+
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const t = totals();
+  const lines = [(state.name || 'My') + ' monthly expenses', 'GRAND TOTAL: ' + fmt(t.grand) + ' a month (' + fmt(t.grand * 12) + ' a year)', ''];
+  for (const g of GROUPS) {
+    lines.push(g.title + ': ' + fmt(t.groups[g.id]));
+    for (const r of g.rows) if (num(state.rows[r.id].amount)) lines.push('  ' + r.label + ': ' + fmt(num(state.rows[r.id].amount)));
+  }
+  if (t.groups.extra) { lines.push('Anything else: ' + fmt(t.groups.extra)); for (const x of state.extras) if (num(x.amount)) lines.push('  ' + (x.name || 'Other') + ': ' + fmt(num(x.amount))); }
+  if (num(state.income)) lines.push('', 'Money in: ' + fmt(num(state.income)));
+  if (state.notes) lines.push('', 'Notes: ' + state.notes);
+  document.getElementById('sendMsg').textContent = (await copyText(lines.join('\n'))) ? 'Summary copied.' : 'Copying was blocked on this phone.';
+});
+
+document.getElementById('exportBtn').addEventListener('click', async () => {
+  const ok = await copyText(JSON.stringify(forFinanceGuru(), null, 2));
+  document.getElementById('viewerMsg').textContent = ok ? 'Copied. Keep it in a note: it imports into Finance Guru.' : 'Copying was blocked on this device.';
+});
+document.getElementById('ownBtn').addEventListener('click', () => { location.replace(location.pathname); });
+
+/* ---------- H. Start ---------- */
+function start() {
+  const m = location.hash.match(/^#d=([A-Za-z0-9_-]+)$/);
+  if (m) {
+    try {
+      state = unpack(m[1]); readOnly = true;
+      const when = state.at ? new Date(state.at).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+      document.getElementById('viewerTitle').textContent = (state.name || 'Someone') + '’s expenses' + (when ? ', sent ' + when : '');
+      document.getElementById('viewer').hidden = false;
+    } catch (e) { document.getElementById('broken').hidden = false; load(); }
+  } else {
+    load();
+  }
+  drawAll();
+}
+window.addEventListener('hashchange', () => location.reload());
+start();
+</script>
+</body>
+</html>
