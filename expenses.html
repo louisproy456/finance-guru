@@ -71,6 +71,8 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
 .amount span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .amount input { padding-left: 22px; }
 
+.sendrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.msg.bad { color: var(--bad); }
 .banner { padding: 14px 16px; border-radius: 10px; background: var(--accent-soft); display: flex; flex-direction: column; gap: 8px; }
 .banner.bad { background: var(--bad-soft); color: var(--bad); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -85,6 +87,7 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
 
 @media (max-width: 560px) {
   .who { grid-template-columns: 1fr; }
+  .sendrow { grid-template-columns: 1fr; }
   .line { grid-template-columns: minmax(0, 1.4fr) 64px minmax(0, 1.2fr); }
   .line .q { grid-column: 1 / -1; }
   .line.plain { grid-template-columns: minmax(0, 1fr); }
@@ -115,8 +118,8 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
 
   <section class="card">
     <div class="who">
-      <label for="name">Your name
-        <input id="name" type="text" placeholder="First name" autocomplete="given-name"></label>
+      <label for="name">Your avatar name (not your real name)
+        <input id="name" type="text" placeholder="A nickname only Dad knows" autocomplete="off"></label>
       <label for="income">Money coming in each month (optional)
         <span class="amount"><span>$</span><input id="income" type="number" min="0" step="1" inputmode="decimal" placeholder="after taxes"></span></label>
     </div>
@@ -139,15 +142,23 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
 
   <section class="card" id="sendCard">
     <h2>When you are done</h2>
-    <p class="muted">This makes a private link that holds your numbers. Send it to Dad by text or Telegram. Only people you send the link to can see them.</p>
-    <div class="actions">
+    <p class="muted">Type Dad's email and press the button. Your numbers are emailed to him automatically, with a private link to this form.</p>
+    <div class="sendrow">
+      <label class="field" for="email">Dad's email
+        <input id="email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="dad@example.com"></label>
       <button id="sendBtn" class="primary" type="button">Send to Dad</button>
+    </div>
+    <div class="actions">
+      <button id="mailBtn" type="button">Use my email app instead</button>
+      <button id="shareBtn" type="button">Send another way (text, Telegram)</button>
       <button id="copyBtn" type="button">Copy a text summary</button>
     </div>
+    <a id="mailLink" href="#" hidden>email</a>
     <span id="sendMsg" class="msg" role="status"></span>
     <label class="field" for="linkBox" id="linkWrap" hidden>Your link (press and hold to copy)
       <input id="linkBox" type="text" readonly></label>
-    <p class="muted">Your numbers are also kept on this phone, so you can close the page and come back. Never type bank passwords or card numbers here.</p>
+    <p class="muted">Send to Dad passes your numbers through an outside email service (FormSubmit) to reach him. That is why you use an avatar name, and why you never type your real name, your address, bank passwords or card numbers here.</p>
+    <p class="muted">Your numbers are also kept on this phone, so you can close the page and come back.</p>
   </section>
 </div>
 
@@ -201,7 +212,7 @@ const num = v => { const n = parseFloat(v); return isFinite(n) && n > 0 ? n : 0;
 
 /* ---------- B. The data ---------- */
 function blank() {
-  const s = { name: '', income: '', notes: '', rows: {}, extras: [], at: 0 };
+  const s = { name: '', income: '', notes: '', email: '', rows: {}, extras: [], at: 0 };
   for (const r of ROWS) s.rows[r.id] = { amount: '', day: '', pay: '' };
   return s;
 }
@@ -221,7 +232,7 @@ function load() {
 // Copies saved values onto a fresh blank form, so a missing field never breaks the page.
 function merge(got) {
   const s = blank();
-  s.name = String(got.name || '').slice(0, 60); s.income = got.income || ''; s.notes = String(got.notes || '').slice(0, 1000); s.at = got.at || 0;
+  s.name = String(got.name || '').slice(0, 60); s.income = got.income || ''; s.notes = String(got.notes || '').slice(0, 1000); s.email = String(got.email || '').slice(0, 120); s.at = got.at || 0;
   for (const r of ROWS) if (got.rows && got.rows[r.id]) Object.assign(s.rows[r.id], got.rows[r.id]);
   if (Array.isArray(got.extras)) s.extras = got.extras.slice(0, 30).map(x => ({ name: String(x.name || '').slice(0, 60), amount: x.amount || '' }));
   return s;
@@ -353,6 +364,7 @@ function drawAll() {
   document.getElementById('name').value = state.name;
   document.getElementById('income').value = state.income;
   document.getElementById('notes').value = state.notes;
+  document.getElementById('email').value = state.email;
   for (const id of ['name', 'income', 'notes']) document.getElementById(id).disabled = readOnly;
   document.getElementById('addBtn').hidden = readOnly;
   document.getElementById('sendCard').hidden = readOnly;
@@ -363,6 +375,7 @@ function drawAll() {
 document.getElementById('name').addEventListener('input', e => { state.name = e.target.value; changed(); });
 document.getElementById('income').addEventListener('input', e => { state.income = e.target.value; changed(); });
 document.getElementById('notes').addEventListener('input', e => { state.notes = e.target.value; changed(); });
+document.getElementById('email').addEventListener('input', e => { state.email = e.target.value.trim(); save(); say('', false); });
 document.getElementById('addBtn').addEventListener('click', () => {
   state.extras.push({ name: '', amount: '' }); drawExtras(); changed();
   document.getElementById('x-' + (state.extras.length - 1) + '-name').focus();
@@ -372,30 +385,105 @@ async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
 }
 
-// "Send to Dad": opens the phone's share sheet if it has one, otherwise copies the link.
-document.getElementById('sendBtn').addEventListener('click', async () => {
-  const link = location.href.split('#')[0] + '#d=' + pack();   // works on GitHub and when the file is opened straight from a computer
-  const box = document.getElementById('linkBox'), msg = document.getElementById('sendMsg');
-  box.value = link; document.getElementById('linkWrap').hidden = false;
-  if (navigator.share) {
-    try { await navigator.share({ title: 'My monthly expenses', text: (state.name || 'My') + ' monthly expenses: ' + fmt(totals().grand), url: link }); msg.textContent = 'Shared.'; return; }
-    catch (e) { /* cancelled or blocked: fall through to copying */ }
-  }
-  msg.textContent = (await copyText(link)) ? 'Link copied. Paste it in a message to Dad.' : 'Copy the link from the box below and send it to Dad.';
-  box.focus(); box.select();
-});
+// Builds the private link and shows it in the box (a fallback you can always copy by hand).
+function makeLink() {
+  const link = location.href.split('#')[0].split('?')[0] + '#d=' + pack();
+  document.getElementById('linkBox').value = link;
+  document.getElementById('linkWrap').hidden = false;
+  return link;
+}
+function say(text, bad) {
+  const msg = document.getElementById('sendMsg');
+  msg.textContent = text; msg.className = 'msg' + (bad ? ' bad' : '');
+}
 
-document.getElementById('copyBtn').addEventListener('click', async () => {
-  const t = totals();
-  const lines = [(state.name || 'My') + ' monthly expenses', 'GRAND TOTAL: ' + fmt(t.grand) + ' a month (' + fmt(t.grand * 12) + ' a year)', ''];
+// The outside service that turns a form into an email. No account is needed:
+// the address typed in the "Dad's email" blank becomes part of the web address we post to.
+// The FIRST time an address is used, the service emails that address an "Activate" link.
+const MAILER = 'https://formsubmit.co/ajax/';
+
+function emailOk() {
+  if (/^[^\s@,;\/]+@[^\s@,;\/]+\.[^\s@,;\/]+$/.test(state.email)) return true;
+  say('Type Dad\u2019s email address first, like dad@example.com', true);
+  document.getElementById('email').focus();
+  return false;
+}
+function summaryLines() {
+  const t = totals(), lines = [];
   for (const g of GROUPS) {
     lines.push(g.title + ': ' + fmt(t.groups[g.id]));
     for (const r of g.rows) if (num(state.rows[r.id].amount)) lines.push('  ' + r.label + ': ' + fmt(num(state.rows[r.id].amount)));
   }
   if (t.groups.extra) { lines.push('Anything else: ' + fmt(t.groups.extra)); for (const x of state.extras) if (num(x.amount)) lines.push('  ' + (x.name || 'Other') + ': ' + fmt(num(x.amount))); }
-  if (num(state.income)) lines.push('', 'Money in: ' + fmt(num(state.income)));
+  if (num(state.income)) lines.push('Money in: ' + fmt(num(state.income)));
+  return lines;
+}
+const subjectLine = () => (state.name ? state.name + '\u2019s' : 'My') + ' monthly expenses: ' + fmt(totals().grand);
+
+// "Send to Dad": emails the numbers automatically through the outside service.
+let sending = false;
+document.getElementById('sendBtn').addEventListener('click', async () => {
+  if (sending || !emailOk()) return;
+  const link = makeLink(), t = totals(), btn = document.getElementById('sendBtn');
+  sending = true; btn.disabled = true; say('Sending...', false);
+  let ok = false, reply = '';
+  try {
+    const res = await fetch(MAILER + encodeURIComponent(state.email), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        _subject: subjectLine(),
+        _template: 'table',
+        _captcha: 'false',
+        'Avatar name': state.name || '(none given)',
+        'Grand total each month': fmt(t.grand),
+        'Grand total each year': fmt(t.grand * 12),
+        'Open the full form': link,
+        'Every line': summaryLines().join('\n'),
+        'Notes': state.notes || '(none)',
+        'For Finance Guru (keep this)': JSON.stringify(forFinanceGuru())
+      })
+    });
+    const data = await res.json();
+    ok = res.ok && String(data.success) === 'true';
+    reply = String(data.message || '');
+  } catch (e) { /* no internet, or the service is down */ }
+  sending = false; btn.disabled = false;
+  if (ok) say('Sent to ' + state.email + '. If nothing arrives, Dad should look for an email from FormSubmit asking him to Activate (the first time only), and check his spam folder.', false);
+  else if (/activ/i.test(reply)) say('Almost there. Dad must open the email from FormSubmit and press Activate. This happens the first time only. Then press Send to Dad again.', true);
+  else say('Could not send automatically' + (reply ? ' (' + reply.slice(0, 120) + ')' : '') + '. Try again, or use one of the other buttons below.', true);
+});
+
+// "Use my email app instead": opens the email app with the message already written.
+document.getElementById('mailBtn').addEventListener('click', () => {
+  if (!emailOk()) return;
+  const link = makeLink(), t = totals();
+  const body = 'Hi Dad,\n\nHere are ' + (state.name ? state.name + '\u2019s' : 'my') + ' monthly expenses.\n' +
+    'Grand total: ' + fmt(t.grand) + ' a month (' + fmt(t.grand * 12) + ' a year).\n\n' +
+    'Open this link to see every line:\n' + link + '\n\n' +
+    'Keep this email: the link also carries the numbers for Finance Guru.\n';
+  const a = document.getElementById('mailLink');
+  a.href = 'mailto:' + encodeURIComponent(state.email) + '?subject=' + encodeURIComponent(subjectLine()) + '&body=' + encodeURIComponent(body);
+  a.click();
+  say('Your email app should open with the message ready. Press Send there.', false);
+});
+
+// "Send another way": the phone's share menu if it has one, otherwise copy the link.
+document.getElementById('shareBtn').addEventListener('click', async () => {
+  const link = makeLink(), box = document.getElementById('linkBox');
+  if (navigator.share) {
+    try { await navigator.share({ title: 'My monthly expenses', text: (state.name || 'My') + ' monthly expenses: ' + fmt(totals().grand), url: link }); say('Shared.', false); return; }
+    catch (e) { /* cancelled or blocked: fall through to copying */ }
+  }
+  say((await copyText(link)) ? 'Link copied. Paste it in a message to Dad.' : 'Copy the link from the box below and send it to Dad.', false);
+  box.focus(); box.select();
+});
+
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const t = totals();
+  const lines = [(state.name || 'My') + ' monthly expenses', 'GRAND TOTAL: ' + fmt(t.grand) + ' a month (' + fmt(t.grand * 12) + ' a year)', ''].concat(summaryLines());
   if (state.notes) lines.push('', 'Notes: ' + state.notes);
-  document.getElementById('sendMsg').textContent = (await copyText(lines.join('\n'))) ? 'Summary copied.' : 'Copying was blocked on this phone.';
+  say((await copyText(lines.join('\n'))) ? 'Summary copied.' : 'Copying was blocked on this phone.', false);
 });
 
 document.getElementById('exportBtn').addEventListener('click', async () => {
@@ -416,6 +504,9 @@ function start() {
     } catch (e) { document.getElementById('broken').hidden = false; load(); }
   } else {
     load();
+    // Dad can pre-fill his own address by adding ?to=his-email to the form's address.
+    const to = new URLSearchParams(location.search).get('to');
+    if (to && !state.email) { state.email = to.trim().slice(0, 120); save(); }
   }
   drawAll();
 }
