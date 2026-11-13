@@ -72,6 +72,10 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
 .amount span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .amount input { padding-left: 22px; }
 
+.sumrows { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; font-size: 15px; }
+.sumrows .amt { text-align: right; }
+.sumrows .op { color: var(--muted); }
+.sumrows .line-top { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 2px; font-weight: 600; }
 .sendrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .msg.bad { color: var(--bad); }
 .banner { padding: 14px 16px; border-radius: 10px; background: var(--accent-soft); display: flex; flex-direction: column; gap: 8px; }
@@ -101,9 +105,15 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
 <div class="wrap">
 
   <div>
-    <h1>Life Expenses Form <span class="rev">Rev 2.0</span></h1>
+    <h1>Life Expenses Form <span class="rev">Rev 2.1</span></h1>
     <p class="muted">Type what each thing costs you in a normal month. A good guess is fine. Leave a line empty if it does not apply to you.</p>
   </div>
+
+  <!-- Sum of all the sections, always at the top. It fills in by itself as the blanks are typed. -->
+  <section class="card" id="topTotals" aria-live="polite">
+    <div class="head"><h2>Total of all sections</h2><span class="sub" id="top-grand">$0.00</span></div>
+    <div class="sumrows" id="sumRows"></div>
+  </section>
 
   <!-- Shown when someone opens a link that another person sent -->
   <div id="viewer" class="banner" hidden>
@@ -350,6 +360,16 @@ function drawTotals() {
   for (const g of GROUPS) document.getElementById('sub-' + g.id).textContent = fmt(t.groups[g.id]);
   document.getElementById('sub-extra').textContent = fmt(t.groups.extra);
   document.getElementById('grand').textContent = fmt(t.grand);
+  // The summary at the top: one line per section, then the sum.
+  document.getElementById('top-grand').textContent = fmt(t.grand);
+  const sum = document.getElementById('sumRows');
+  sum.textContent = '';
+  const parts = GROUPS.map(g => [g.title, t.groups[g.id]]).concat([['Anything else', t.groups.extra]]);
+  parts.forEach(([title, amount], i) => {
+    sum.append(el('span', { textContent: (i ? '+ ' : '') + title }), el('span', { className: 'amt', textContent: fmt(amount) }));
+  });
+  sum.append(el('span', { className: 'line-top', textContent: '= Grand total each month' }),
+             el('span', { className: 'amt line-top', id: 'top-sum', textContent: fmt(t.grand) }));
   document.getElementById('yearly').textContent = 'That is ' + fmt(t.grand * 12) + ' a year';
   const income = num(state.income);
   const left = income - t.grand;
