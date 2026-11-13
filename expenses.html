@@ -43,6 +43,7 @@ h1 { font-size: 26px; font-weight: 700; }
 h2 { font-size: 19px; font-weight: 500; }
 p { margin: 0; }
 .muted { color: var(--muted); font-size: 14px; }
+.rev { font-family: var(--body); font-size: 13px; font-weight: 500; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
 [hidden] { display: none !important; }
 
 input, select, button, textarea { font: inherit; color: inherit; }
@@ -100,7 +101,7 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
 <div class="wrap">
 
   <div>
-    <h1>Life Expenses Form</h1>
+    <h1>Life Expenses Form <span class="rev">Rev 2.0</span></h1>
     <p class="muted">Type what each thing costs you in a normal month. A good guess is fine. Leave a line empty if it does not apply to you.</p>
   </div>
 
@@ -119,7 +120,7 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
   <section class="card">
     <div class="who">
       <label for="name">Your avatar name (not your real name)
-        <input id="name" type="text" placeholder="A nickname only Dad knows" autocomplete="off"></label>
+        <input id="name" type="text" placeholder="A nickname, not your real name" autocomplete="off"></label>
       <label for="income">Money coming in each month (optional)
         <span class="amount"><span>$</span><input id="income" type="number" min="0" step="1" inputmode="decimal" placeholder="after taxes"></span></label>
     </div>
@@ -136,17 +137,16 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
   </section>
 
   <section class="card">
-    <label class="field" for="notes">Notes for Dad (optional)
+    <label class="field" for="notes">Notes for the Bot (optional)
       <textarea id="notes" rows="3" placeholder="Anything you were not sure about, or bills that change a lot"></textarea></label>
   </section>
 
   <section class="card" id="sendCard">
     <h2>When you are done</h2>
-    <p class="muted">Type Dad's email and press the button. Your numbers are emailed to him automatically, with a private link to this form.</p>
     <div class="sendrow">
-      <label class="field" for="email">Dad's email
-        <input id="email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="dad@example.com"></label>
-      <button id="sendBtn" class="primary" type="button">Send to Dad</button>
+      <label class="field" for="email">Bot's email
+        <input id="email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="bot@example.com"></label>
+      <button id="sendBtn" class="primary" type="button">Send to Bot</button>
     </div>
     <div class="actions">
       <button id="mailBtn" type="button">Use my email app instead</button>
@@ -157,8 +157,7 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
     <span id="sendMsg" class="msg" role="status"></span>
     <label class="field" for="linkBox" id="linkWrap" hidden>Your link (press and hold to copy)
       <input id="linkBox" type="text" readonly></label>
-    <p class="muted">Send to Dad passes your numbers through an outside email service (FormSubmit) to reach him. That is why you use an avatar name, and why you never type your real name, your address, bank passwords or card numbers here.</p>
-    <p class="muted">Your numbers are also kept on this phone, so you can close the page and come back.</p>
+    <p class="muted">Avatar name only. Never type your real name, address, bank passwords or card numbers.</p>
   </section>
 </div>
 
@@ -176,7 +175,7 @@ button.del { padding: 9px 0; width: 38px; color: var(--muted); }
    What it does:
      * shows one blank per monthly expense and adds everything up
      * keeps the numbers in this browser so nothing is lost
-     * "Send to Dad" packs the numbers into a link (no server needed)
+     * "Send to Bot" emails the numbers, with a link that holds them
      * "Copy for Finance Guru" turns them into the exact shape the
        main Finance Guru page stores, so they can be imported later
    ==================================================================== */
@@ -398,13 +397,13 @@ function say(text, bad) {
 }
 
 // The outside service that turns a form into an email. No account is needed:
-// the address typed in the "Dad's email" blank becomes part of the web address we post to.
+// the address typed in the "Bot's email" blank becomes part of the web address we post to.
 // The FIRST time an address is used, the service emails that address an "Activate" link.
 const MAILER = 'https://formsubmit.co/ajax/';
 
 function emailOk() {
   if (/^[^\s@,;\/]+@[^\s@,;\/]+\.[^\s@,;\/]+$/.test(state.email)) return true;
-  say('Type Dad\u2019s email address first, like dad@example.com', true);
+  say('Type the Bot\u2019s email address first, like bot@example.com', true);
   document.getElementById('email').focus();
   return false;
 }
@@ -420,7 +419,7 @@ function summaryLines() {
 }
 const subjectLine = () => (state.name ? state.name + '\u2019s' : 'My') + ' monthly expenses: ' + fmt(totals().grand);
 
-// "Send to Dad": emails the numbers automatically through the outside service.
+// "Send to Bot": emails the numbers automatically through the outside service.
 let sending = false;
 document.getElementById('sendBtn').addEventListener('click', async () => {
   if (sending || !emailOk()) return;
@@ -449,8 +448,8 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     reply = String(data.message || '');
   } catch (e) { /* no internet, or the service is down */ }
   sending = false; btn.disabled = false;
-  if (ok) say('Sent to ' + state.email + '. If nothing arrives, Dad should look for an email from FormSubmit asking him to Activate (the first time only), and check his spam folder.', false);
-  else if (/activ/i.test(reply)) say('Almost there. Dad must open the email from FormSubmit and press Activate. This happens the first time only. Then press Send to Dad again.', true);
+  if (ok) say('Sent to ' + state.email + '. If nothing arrives, look in that inbox for an email from FormSubmit asking to Activate (the first time only), and check the spam folder.', false);
+  else if (/activ/i.test(reply)) say('Almost there. Open the email from FormSubmit in that inbox and press Activate. This happens the first time only. Then press Send to Bot again.', true);
   else say('Could not send automatically' + (reply ? ' (' + reply.slice(0, 120) + ')' : '') + '. Try again, or use one of the other buttons below.', true);
 });
 
@@ -458,7 +457,7 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
 document.getElementById('mailBtn').addEventListener('click', () => {
   if (!emailOk()) return;
   const link = makeLink(), t = totals();
-  const body = 'Hi Dad,\n\nHere are ' + (state.name ? state.name + '\u2019s' : 'my') + ' monthly expenses.\n' +
+  const body = 'Hello,\n\nHere are ' + (state.name ? state.name + '\u2019s' : 'my') + ' monthly expenses.\n' +
     'Grand total: ' + fmt(t.grand) + ' a month (' + fmt(t.grand * 12) + ' a year).\n\n' +
     'Open this link to see every line:\n' + link + '\n\n' +
     'Keep this email: the link also carries the numbers for Finance Guru.\n';
@@ -475,7 +474,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     try { await navigator.share({ title: 'My monthly expenses', text: (state.name || 'My') + ' monthly expenses: ' + fmt(totals().grand), url: link }); say('Shared.', false); return; }
     catch (e) { /* cancelled or blocked: fall through to copying */ }
   }
-  say((await copyText(link)) ? 'Link copied. Paste it in a message to Dad.' : 'Copy the link from the box below and send it to Dad.', false);
+  say((await copyText(link)) ? 'Link copied. Paste it in a message.' : 'Copy the link from the box below and send it.', false);
   box.focus(); box.select();
 });
 
@@ -504,7 +503,7 @@ function start() {
     } catch (e) { document.getElementById('broken').hidden = false; load(); }
   } else {
     load();
-    // Dad can pre-fill his own address by adding ?to=his-email to the form's address.
+    // The address can be pre-filled by adding ?to=the-email to the form's address.
     const to = new URLSearchParams(location.search).get('to');
     if (to && !state.email) { state.email = to.trim().slice(0, 120); save(); }
   }
